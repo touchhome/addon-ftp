@@ -1,0 +1,8 @@
+{
+  "workspace": {
+    "ftp-storage": "Ftp"
+  },
+  "selection": {
+    "FtpEntity": "FTP"
+  }
+}

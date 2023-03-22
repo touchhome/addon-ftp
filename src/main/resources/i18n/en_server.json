@@ -1,0 +1,5 @@
+{
+  "ftp": {
+    "description": "Configure url, user/password to access ftp. I.e.: <a target='_blank' href='https://www.drivehq.com'>drivehq</a> has free 5GB storage. Url is: ftp.drivehq.com. User/Pwd from created account"
+  }
+}
