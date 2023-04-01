@@ -1,9 +1,9 @@
-package org.touchhome.bundle.ftp;
+package org.homio.bundle.ftp;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.stereotype.Component;
-import org.touchhome.bundle.api.BundleEntrypoint;
+import org.homio.bundle.api.BundleEntrypoint;
 
 @Log4j2
 @Component

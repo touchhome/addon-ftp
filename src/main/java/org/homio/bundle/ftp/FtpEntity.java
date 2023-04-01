@@ -1,4 +1,4 @@
-package org.touchhome.bundle.ftp;
+package org.homio.bundle.ftp;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.pivovarit.function.ThrowingFunction;
@@ -9,15 +9,15 @@ import javax.persistence.Transient;
 import lombok.Getter;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.net.ftp.FTPClient;
-import org.touchhome.bundle.api.EntityContext;
-import org.touchhome.bundle.api.entity.storage.BaseFileSystemEntity;
-import org.touchhome.bundle.api.entity.types.StorageEntity;
-import org.touchhome.bundle.api.model.ActionResponseModel;
-import org.touchhome.bundle.api.ui.UISidebarChildren;
-import org.touchhome.bundle.api.ui.field.UIField;
-import org.touchhome.bundle.api.ui.field.action.UIContextMenuAction;
-import org.touchhome.bundle.api.ui.field.action.v1.UIInputBuilder;
-import org.touchhome.bundle.api.util.SecureString;
+import org.homio.bundle.api.EntityContext;
+import org.homio.bundle.api.entity.storage.BaseFileSystemEntity;
+import org.homio.bundle.api.entity.types.StorageEntity;
+import org.homio.bundle.api.model.ActionResponseModel;
+import org.homio.bundle.api.ui.UISidebarChildren;
+import org.homio.bundle.api.ui.field.UIField;
+import org.homio.bundle.api.ui.field.action.UIContextMenuAction;
+import org.homio.bundle.api.ui.field.action.v1.UIInputBuilder;
+import org.homio.bundle.api.util.SecureString;
 
 @Entity
 @UISidebarChildren(icon = "fas fa-network-wired", color = "#b32317")

@@ -1,9 +1,9 @@
-package org.touchhome.bundle.ftp;
+package org.homio.bundle.ftp;
 
 import lombok.Getter;
 import org.springframework.stereotype.Component;
-import org.touchhome.bundle.api.EntityContext;
-import org.touchhome.bundle.api.entity.storage.Scratch3BaseFileSystemExtensionBlocks;
+import org.homio.bundle.api.EntityContext;
+import org.homio.bundle.api.entity.storage.Scratch3BaseFileSystemExtensionBlocks;
 
 @Getter
 @Component

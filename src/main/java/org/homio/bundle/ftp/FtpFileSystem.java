@@ -1,4 +1,4 @@
-package org.touchhome.bundle.ftp;
+package org.homio.bundle.ftp;
 
 import static org.apache.commons.net.ftp.FTPFile.DIRECTORY_TYPE;
 
@@ -24,8 +24,8 @@ import org.apache.commons.net.ftp.FTPClient;
 import org.apache.commons.net.ftp.FTPFile;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.touchhome.bundle.api.fs.FileSystemProvider;
-import org.touchhome.bundle.api.fs.TreeNode;
+import org.homio.bundle.api.fs.FileSystemProvider;
+import org.homio.bundle.api.fs.TreeNode;
 
 public class FtpFileSystem implements FileSystemProvider {
 
