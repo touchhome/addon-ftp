@@ -1,24 +1,28 @@
-package org.homio.bundle.ftp;
+package org.homio.addon.ftp;
 
 import com.pivovarit.function.ThrowingFunction;
+import jakarta.persistence.Entity;
 import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.Proxy;
+import java.net.Proxy.Type;
+import java.time.Duration;
 import java.util.Objects;
-import javax.persistence.Entity;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.net.ftp.FTP;
 import org.apache.commons.net.ftp.FTPClient;
-import org.homio.bundle.api.EntityContext;
-import org.homio.bundle.api.entity.storage.BaseFileSystemEntity;
-import org.homio.bundle.api.entity.types.StorageEntity;
-import org.homio.bundle.api.model.ActionResponseModel;
-import org.homio.bundle.api.ui.UISidebarChildren;
-import org.homio.bundle.api.ui.field.UIField;
-import org.homio.bundle.api.ui.field.UIFieldGroup;
-import org.homio.bundle.api.ui.field.UIFieldPort;
-import org.homio.bundle.api.ui.field.UIFieldSlider;
-import org.homio.bundle.api.ui.field.action.UIContextMenuAction;
-import org.homio.bundle.api.ui.field.action.v1.UIInputBuilder;
-import org.homio.bundle.api.util.SecureString;
+import org.homio.api.EntityContext;
+import org.homio.api.entity.storage.BaseFileSystemEntity;
+import org.homio.api.entity.types.StorageEntity;
+import org.homio.api.model.ActionResponseModel;
+import org.homio.api.ui.UISidebarChildren;
+import org.homio.api.ui.field.UIField;
+import org.homio.api.ui.field.UIFieldGroup;
+import org.homio.api.ui.field.UIFieldPort;
+import org.homio.api.ui.field.UIFieldSlider;
+import org.homio.api.ui.field.action.UIContextMenuAction;
+import org.homio.api.ui.field.action.v1.UIInputBuilder;
+import org.homio.api.util.SecureString;
 import org.jetbrains.annotations.NotNull;
 
 @Entity
@@ -32,7 +36,7 @@ public class FtpEntity extends StorageEntity<FtpEntity> implements BaseFileSyste
   }
 
   @UIField(order = 1, required = true, inlineEditWhenEmpty = true)
-  @UIFieldGroup(value = "CONNECT", order = 10, borderColor = "#9C27B0")
+  @UIFieldGroup(value = "CONNECT", order = 10, borderColor = "#2782B0")
   public String getUrl() {
     return getJsonData("url");
   }
@@ -75,7 +79,7 @@ public class FtpEntity extends StorageEntity<FtpEntity> implements BaseFileSyste
     setJsonData("ct", value);
   }
 
-  @UIField(order = 40)
+  @UIField(order = 1)
   @UIFieldGroup(value = "AUTH", order = 10, borderColor = "#9C1A9C")
   public String getUser() {
     return getJsonData("user");
@@ -86,7 +90,7 @@ public class FtpEntity extends StorageEntity<FtpEntity> implements BaseFileSyste
     return this;
   }
 
-  @UIField(order = 50)
+  @UIField(order = 2)
   @UIFieldGroup("AUTH")
   public SecureString getPassword() {
     return getJsonSecure("pwd");
@@ -95,6 +99,36 @@ public class FtpEntity extends StorageEntity<FtpEntity> implements BaseFileSyste
   public FtpEntity setPassword(String value) {
     setJsonData("pwd", value);
     return this;
+  }
+
+  @UIField(order = 1, hideInView = true)
+  @UIFieldGroup(value = "PROXY", order = 20, borderColor = "#8C324C")
+  public Proxy.Type getProxyType() {
+    return getJsonDataEnum("pt", Type.DIRECT);
+  }
+
+  public void setProxyType(Proxy.Type value) {
+    setJsonDataEnum("pt", value);
+  }
+
+  @UIField(order = 2, hideInView = true)
+  @UIFieldGroup("PROXY")
+  public String getProxyHost() {
+    return getJsonData("ph");
+  }
+
+  public void setProxyHost(String value) {
+    setJsonData("ph", value);
+  }
+
+  @UIField(order = 3, hideInView = true)
+  @UIFieldGroup("PROXY")
+  public int getProxyPort() {
+    return getJsonData("pp", 0);
+  }
+
+  public void setProxyPort(int value) {
+    setJsonData("pp", value);
   }
 
   @Override
@@ -159,12 +193,12 @@ public class FtpEntity extends StorageEntity<FtpEntity> implements BaseFileSyste
 
   @UIContextMenuAction(value = "TEST_CONNECTION", icon = "fas fa-ethernet")
   public ActionResponseModel testConnection() {
-    FTPClient ftpClient = new FTPClient();
+    FTPClient ftpClient = createFtpClient();
     try {
       try {
         ftpClient.connect(getUrl());
       } catch (Exception ex) {
-        return ActionResponseModel.showError("Error connect to remove url: " + ex.getMessage());
+        return ActionResponseModel.showError("Error connect to remote url: " + ex.getMessage());
       }
       try {
         if (!ftpClient.login(getUser(), getPassword().asString())) {
@@ -183,10 +217,10 @@ public class FtpEntity extends StorageEntity<FtpEntity> implements BaseFileSyste
   }
 
   public <T> T execute(ThrowingFunction<FTPClient, T, Exception> handler, boolean localPassive) throws Exception {
-    FTPClient ftpClient = new FTPClient();
+    FTPClient ftpClient = createFtpClient();
     Exception exception;
     try {
-      ftpClient.connect(getUrl());
+      ftpClient.connect(getUrl(), getPort());
       if (!ftpClient.login(getUser(), getPassword().asString())) {
         throw new RuntimeException(ftpClient.getReplyString());
       }
@@ -204,6 +238,17 @@ public class FtpEntity extends StorageEntity<FtpEntity> implements BaseFileSyste
       ftpClient.disconnect();
     }
     throw exception;
+  }
+
+  @NotNull
+  private FTPClient createFtpClient() {
+    FTPClient ftpClient = new FTPClient();
+    ftpClient.setConnectTimeout(getConnectTimeout() * 1000);
+    ftpClient.setControlKeepAliveTimeout(Duration.ofSeconds(getControlKeepAliveTimeout()));
+    if (getProxyType() != Type.DIRECT) {
+      ftpClient.setProxy(new Proxy(getProxyType(), new InetSocketAddress(getProxyHost(), getProxyPort())));
+    }
+    return ftpClient;
   }
 
   @Override

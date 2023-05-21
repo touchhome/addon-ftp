@@ -1,4 +1,4 @@
-package org.homio.bundle.ftp;
+package org.homio.addon.ftp;
 
 import static org.apache.commons.net.ftp.FTPFile.DIRECTORY_TYPE;
 
@@ -16,12 +16,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import org.apache.commons.net.ftp.FTPClient;
 import org.apache.commons.net.ftp.FTPFile;
-import org.homio.bundle.api.EntityContext;
-import org.homio.bundle.api.entity.storage.BaseFileSystemEntity;
-import org.homio.bundle.api.fs.BaseCachedFileSystemProvider;
-import org.homio.bundle.api.fs.TreeNode;
-import org.homio.bundle.ftp.FtpFileSystem.FtpFile;
-import org.homio.bundle.ftp.FtpFileSystem.FtpFileService;
+import org.homio.api.EntityContext;
+import org.homio.api.entity.storage.BaseFileSystemEntity;
+import org.homio.api.fs.BaseCachedFileSystemProvider;
+import org.homio.api.fs.TreeNode;
+import org.homio.addon.ftp.FtpFileSystem.FtpFile;
+import org.homio.addon.ftp.FtpFileSystem.FtpFileService;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 

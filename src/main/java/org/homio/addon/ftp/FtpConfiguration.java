@@ -1,10 +1,10 @@
-package org.homio.bundle.ftp;
+package org.homio.addon.ftp;
 
+import org.homio.api.AddonConfiguration;
 import org.springframework.context.annotation.Configuration;
-import org.homio.bundle.api.BundleConfiguration;
 
 @Configuration
-@BundleConfiguration
+@AddonConfiguration
 public class FtpConfiguration {
 
 }
