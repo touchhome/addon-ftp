@@ -1,13 +1,11 @@
 package org.homio.bundle.ftp;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.pivovarit.function.ThrowingFunction;
 import java.io.IOException;
 import java.util.Objects;
 import javax.persistence.Entity;
-import javax.persistence.Transient;
-import lombok.Getter;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.net.ftp.FTP;
 import org.apache.commons.net.ftp.FTPClient;
 import org.homio.bundle.api.EntityContext;
 import org.homio.bundle.api.entity.storage.BaseFileSystemEntity;
@@ -15,9 +13,13 @@ import org.homio.bundle.api.entity.types.StorageEntity;
 import org.homio.bundle.api.model.ActionResponseModel;
 import org.homio.bundle.api.ui.UISidebarChildren;
 import org.homio.bundle.api.ui.field.UIField;
+import org.homio.bundle.api.ui.field.UIFieldGroup;
+import org.homio.bundle.api.ui.field.UIFieldPort;
+import org.homio.bundle.api.ui.field.UIFieldSlider;
 import org.homio.bundle.api.ui.field.action.UIContextMenuAction;
 import org.homio.bundle.api.ui.field.action.v1.UIInputBuilder;
 import org.homio.bundle.api.util.SecureString;
+import org.jetbrains.annotations.NotNull;
 
 @Entity
 @UISidebarChildren(icon = "fas fa-network-wired", color = "#b32317")
@@ -25,16 +27,12 @@ public class FtpEntity extends StorageEntity<FtpEntity> implements BaseFileSyste
 
   public static final String PREFIX = "ftp_";
 
-  @JsonIgnore
-  @Transient
-  @Getter
-  private FTPClient ftpClient;
-
-  public String getFileSystemRoot() {
+  public @NotNull String getFileSystemRoot() {
     return getJsonData("fs_root", "/");
   }
 
-  @UIField(order = 30, required = true, inlineEditWhenEmpty = true)
+  @UIField(order = 1, required = true, inlineEditWhenEmpty = true)
+  @UIFieldGroup(value = "CONNECT", order = 10, borderColor = "#9C27B0")
   public String getUrl() {
     return getJsonData("url");
   }
@@ -44,7 +42,41 @@ public class FtpEntity extends StorageEntity<FtpEntity> implements BaseFileSyste
     return this;
   }
 
+  @UIField(order = 2)
+  @UIFieldPort(min = 0)
+  @UIFieldGroup("CONNECT")
+  public int getPort() {
+    return getJsonData("port", FTP.DEFAULT_PORT);
+  }
+
+  public void setPort(int value) {
+    setJsonData("port", value);
+  }
+
+  @UIField(order = 3)
+  @UIFieldSlider(min = 0, max = 60)
+  @UIFieldGroup("CONNECT")
+  public int getControlKeepAliveTimeout() {
+    return getJsonData("kat", 0);
+  }
+
+  public void setControlKeepAliveTimeout(int value) {
+    setJsonData("kat", value);
+  }
+
+  @UIField(order = 4)
+  @UIFieldSlider(min = 5, max = 60)
+  @UIFieldGroup("CONNECT")
+  public int getConnectTimeout() {
+    return getJsonData("ct", 60);
+  }
+
+  public void setConnectTimeout(int value) {
+    setJsonData("ct", value);
+  }
+
   @UIField(order = 40)
+  @UIFieldGroup(value = "AUTH", order = 10, borderColor = "#9C1A9C")
   public String getUser() {
     return getJsonData("user");
   }
@@ -55,6 +87,7 @@ public class FtpEntity extends StorageEntity<FtpEntity> implements BaseFileSyste
   }
 
   @UIField(order = 50)
+  @UIFieldGroup("AUTH")
   public SecureString getPassword() {
     return getJsonSecure("pwd");
   }
@@ -91,12 +124,17 @@ public class FtpEntity extends StorageEntity<FtpEntity> implements BaseFileSyste
 
   @Override
   public FtpFileSystem buildFileSystem(EntityContext entityContext) {
-    return new FtpFileSystem(this);
+    return new FtpFileSystem(this, entityContext);
   }
 
   @Override
   public long getConnectionHashCode() {
     return Objects.hash(getUrl(), getUser(), getPassword());
+  }
+
+  @Override
+  public boolean isShowHiddenFiles() {
+    return true;
   }
 
   @Override
@@ -152,7 +190,6 @@ public class FtpEntity extends StorageEntity<FtpEntity> implements BaseFileSyste
       if (!ftpClient.login(getUser(), getPassword().asString())) {
         throw new RuntimeException(ftpClient.getReplyString());
       }
-      this.ftpClient = ftpClient;
       if (localPassive) {
         ftpClient.enterLocalPassiveMode();
       }
@@ -165,7 +202,6 @@ public class FtpEntity extends StorageEntity<FtpEntity> implements BaseFileSyste
       } catch (Exception ignore) {
       }
       ftpClient.disconnect();
-      this.ftpClient = null;
     }
     throw exception;
   }

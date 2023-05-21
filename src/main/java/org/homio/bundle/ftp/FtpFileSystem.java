@@ -2,287 +2,170 @@ package org.homio.bundle.ftp;
 
 import static org.apache.commons.net.ftp.FTPFile.DIRECTORY_TYPE;
 
-import com.google.common.primitives.Bytes;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
+import java.util.Calendar;
 import java.util.List;
-import java.util.Set;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.net.ftp.FTPClient;
 import org.apache.commons.net.ftp.FTPFile;
+import org.homio.bundle.api.EntityContext;
+import org.homio.bundle.api.entity.storage.BaseFileSystemEntity;
+import org.homio.bundle.api.fs.BaseCachedFileSystemProvider;
+import org.homio.bundle.api.fs.TreeNode;
+import org.homio.bundle.ftp.FtpFileSystem.FtpFile;
+import org.homio.bundle.ftp.FtpFileSystem.FtpFileService;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.homio.bundle.api.fs.FileSystemProvider;
-import org.homio.bundle.api.fs.TreeNode;
 
-public class FtpFileSystem implements FileSystemProvider {
+public class FtpFileSystem extends BaseCachedFileSystemProvider<FtpEntity, FtpFile, FtpFileService> {
 
-  private FtpEntity entity;
-  private long connectionHashCode;
-
-  public FtpFileSystem(FtpEntity entity) {
-    this.entity = entity;
+  public FtpFileSystem(FtpEntity entity, EntityContext entityContext) {
+    super(entity, entityContext);
   }
 
   @Override
-  public boolean restart(boolean force) {
-    try {
-      if (!force && connectionHashCode == entity.getConnectionHashCode()) {
-        return true;
-      }
-      dispose();
-      getChildren("");
-      entity.setStatusOnline();
-      connectionHashCode = entity.getConnectionHashCode();
-      return true;
-    } catch (Exception ex) {
-      entity.setStatusError(ex);
-      return false;
+  protected @NotNull FtpFileService createService() {
+    return new FtpFileService();
+  }
+
+  @Override
+  protected void buildTreeNodeExternal(TreeNode treeNode, FtpFile file) {
+  }
+
+  @RequiredArgsConstructor
+  public class FtpFile implements FsFileEntity<FtpFile> {
+
+    private final @NotNull String id;
+    private final @NotNull FTPFile file;
+
+    @Override
+    public @NotNull String getAbsolutePath() {
+      return id;
     }
-  }
 
-  @Override
-  public void setEntity(Object entity) {
-    this.entity = (FtpEntity) entity;
-    restart(false);
-  }
+    @Override
+    public boolean isDirectory() {
+      return file.isDirectory();
+    }
 
-  @Override
-  @SneakyThrows
-  public InputStream getEntryInputStream(@NotNull String id) {
-    return entity.execute(ftpClient -> {
-      ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-      ftpClient.setFileType(FTPClient.BINARY_FILE_TYPE);
-      if (!ftpClient.retrieveFile(id, outputStream)) {
-        throw new RuntimeException(
-            "Unable to retrieve file: <" + id + "> from ftp. Msg: " + ftpClient.getReplyString());
-      }
-      return new ByteArrayInputStream(outputStream.toByteArray());
-    }, true);
-  }
+    @Override
+    public Long getSize() {
+      return file.getSize() == -1 ? null : file.getSize();
+    }
 
-  @SneakyThrows
-  @Override
-  public Set<TreeNode> toTreeNodes(@NotNull Set<String> ids) {
-    return entity.execute(ftpClient -> {
-      Set<TreeNode> fmPaths = new HashSet<>();
-      for (String id : ids) {
-        FTPFile ftpFile = ftpClient.mlistFile(id);
-        fmPaths.add(buildTreeNode(ftpFile, ftpFile.getName()));
-      }
-      return fmPaths;
-    }, true);
-  }
+    @Override
+    public Long getModifiedDateTime() {
+      return Optional.ofNullable(file.getTimestamp()).map(Calendar::getTimeInMillis).orElse(null);
+    }
 
-  @Override
-  @SneakyThrows
-  public TreeNode delete(@NotNull Set<String> ids) {
-    List<FTPFile> files = entity.execute(ftpClient -> {
-      List<FTPFile> deletedFiles = new ArrayList<>();
-      for (String id : ids) {
-        if (ftpClient.deleteFile(id)) {
-          deletedFiles.add(ftpFile(id));
-        }
-      }
-      return deletedFiles;
-    }, true);
-    return buildRoot(files);
-  }
-
-  @Override
-  @SneakyThrows
-  public TreeNode create(@NotNull String parentId, @NotNull String name, boolean isDir, UploadOption uploadOption) {
-    Path path = entity.execute(ftpClient -> {
-      Path fullPath = Paths.get("", parentId).resolve(name);
-      String targetPath = fullPath.toString();
-      if (isDir) {
-        ftpClient.makeDirectory(targetPath);
-      } else {
-        byte[] value = new byte[0];
-        ftpClient.setFileType(FTPClient.BINARY_FILE_TYPE);
-        if (!ftpClient.storeFile(targetPath, new ByteArrayInputStream(value))) {
-          throw new RuntimeException(ftpClient.getReplyString());
-        }
-      }
-      return fullPath;
-    }, true);
-    return buildRoot(Collections.singletonList(ftpFile(path.toString())));
-  }
-
-  @Override
-  @SneakyThrows
-  public TreeNode rename(@NotNull String id, @NotNull String newName, UploadOption uploadOption) {
-    return entity.execute(ftpClient -> {
-      FTPFile ftpFile = ftpClient.mlistFile(id);
-      if (ftpFile != null) {
-        String toPath = Paths.get(id).resolveSibling(newName).toString();
-        if (uploadOption != UploadOption.Replace) {
-          FTPFile toFile = ftpClient.mlistFile(toPath);
-          if (toFile != null) {
-            if (uploadOption == UploadOption.Error) {
-              throw new FileAlreadyExistsException("File " + newName + " already exists");
-            } else if (uploadOption == UploadOption.SkipExist) {
-              return null;
-            }
-          }
-        }
-        if (ftpClient.rename(id, toPath)) {
-          ftpFile.setName(toPath);
-          return buildRoot(Collections.singletonList(ftpFile));
-        }
-      }
-      throw new IllegalStateException("File '" + id + "' not found");
-    }, true);
-  }
-
-  @Override
-  public TreeNode copy(@NotNull Collection<TreeNode> entries, @NotNull String targetId, UploadOption uploadOption) {
-    List<FTPFile> result = new ArrayList<>();
-    copyEntries(entries, targetId, uploadOption, result);
-    return buildRoot(result);
-  }
-
-  @SneakyThrows
-  private void copyEntries(Collection<TreeNode> entries, String targetId, UploadOption uploadOption, List<FTPFile> result) {
-    entity.execute(ftpClient -> {
-      for (TreeNode entry : entries) {
-        String path = Paths.get(targetId).resolve(entry.getName()).toString();
-
-        FTPFile ftpFile = ftpClient.mlistFile(path);
-
-        if (!entry.getAttributes().isDir()) {
-          try (InputStream stream = entry.getInputStream()) {
-            if (ftpFile != null) {
-              if (uploadOption == UploadOption.Append) {
-                byte[] prependContent = IOUtils.toByteArray(ftpClient.retrieveFileStream(path));
-                byte[] content = Bytes.concat(prependContent, IOUtils.toByteArray(stream));
-                ftpClient.appendFile(path, new ByteArrayInputStream(content));
-              } else {
-                ftpClient.storeFile(path, stream);
-              }
-            } else {
-              ftpClient.storeFile(path, stream);
-            }
-            result.add(ftpClient.mlistFile(path));
-          }
-        } else {
-          ftpClient.makeDirectory(path);
-          FTPFile ftpFolder = ftpFile(entry.getName());
-          ftpFolder.setType(DIRECTORY_TYPE);
-          result.add(ftpFolder);
-          copyEntries(entry.getFileSystem().getChildren(entry), path, uploadOption, result);
-        }
-      }
-      return null;
-    }, true);
-  }
-
-  @Override
-  @SneakyThrows
-  public Set<TreeNode> loadTreeUpToChild(@Nullable String rootPath, @NotNull String id) {
-    return entity.execute(ftpClient -> {
-      FTPFile ftpFile = ftpClient.mlistFile(id);
-      if (ftpFile == null) {
+    @Override
+    @SneakyThrows
+    public @Nullable FtpFile getParent(boolean stub) {
+      Path parent = Paths.get(id).getParent();
+      if (isPathEmpty(parent)) {
         return null;
       }
-      Set<TreeNode> rootChildren = getChildren("");
-      Set<TreeNode> currentChildren = rootChildren;
-      for (Path pathItem : Paths.get(id)) {
-        TreeNode foundedObject =
-            currentChildren.stream().filter(c -> c.getId().equals(pathItem.toString())).findAny().orElseThrow(() ->
-                new IllegalStateException("Unable find object: " + pathItem));
-        currentChildren = getChildren(pathItem.toString());
-        foundedObject.addChildren(currentChildren);
+      if (stub) {
+        FTPFile ftpFile = new FTPFile();
+        ftpFile.setType(DIRECTORY_TYPE);
+        ftpFile.setName(parent.getFileName().toString());
+        return new FtpFile(fixPath(parent), ftpFile);
+      } else {
+        return service.getFile(fixPath(parent));
       }
-      return rootChildren;
-    }, true);
-  }
+    }
 
-  @Override
-  @SneakyThrows
-  public @NotNull Set<TreeNode> getChildren(@NotNull String parentId) {
-    return entity.execute(ftpClient -> {
-      FTPFile[] ftpFiles = ftpClient.listFiles(parentId);
-      return Stream.of(ftpFiles)
-          .map(ftpFile -> buildTreeNode(ftpFile, Paths.get(parentId).resolve(ftpFile.getName()).toString()))
-          .collect(Collectors.toSet());
-    }, true);
-  }
+    @Override
+    public boolean hasChildren() {
+      return file.getSize() != 6;
+    }
 
-  @Override
-  @SneakyThrows
-  public Set<TreeNode> getChildrenRecursively(@NotNull String parentId) {
-    return entity.execute(ftpClient -> {
-      TreeNode root = new TreeNode();
-      buildTreeNodeRecursively(parentId, ftpClient, root);
-      return root.getChildren();
-    }, true);
-  }
-
-  private void buildTreeNodeRecursively(String parentId, FTPClient ftpClient, TreeNode parent) throws IOException {
-    for (FTPFile ftpFile : ftpClient.listFiles(parentId)) {
-      String id = Paths.get(parentId).resolve(ftpFile.getName()).toString();
-      TreeNode child = parent.addChild(buildTreeNode(ftpFile, id));
-      buildTreeNodeRecursively(id, ftpClient, child);
+    @Override
+    public BaseFileSystemEntity getEntity() {
+      return entity;
     }
   }
 
-  @Override
-  public long getTotalSpace() {
-    return -1;
-  }
+  public class FtpFileService implements BaseFSService<FtpFile> {
 
-  @Override
-  public long getUsedSpace() {
-    return -1;
-  }
-
-  private TreeNode buildTreeNode(FTPFile ftpFile, String id) {
-    id = id.replaceAll("\\\\", "/");
-    if (id.startsWith("/")) {
-      id = id.substring(1);
+    @Override
+    @SneakyThrows
+    public void close() {
     }
-    String name = Paths.get(ftpFile.getName()).getFileName().toString();
-    long timestamp = ftpFile.getTimestamp() == null ? 0 : ftpFile.getTimestamp().getTimeInMillis();
-    return new TreeNode(ftpFile.isDirectory(), false, name, id,
-        ftpFile.getSize(), timestamp, this, null);
-  }
 
-  private FTPFile ftpFile(String path) {
-    FTPFile ftpFile = new FTPFile();
-    ftpFile.setName(path);
-    return ftpFile;
-  }
-
-  private TreeNode buildRoot(List<FTPFile> result) {
-    Path root = Paths.get(entity.getFileSystemRoot());
-    TreeNode rootPath = this.buildTreeNode(ftpFile(""), "");
-    // ftpFile.getName() return FQN
-    for (FTPFile ftpFile : result) {
-      Path pathCursor = root;
-      TreeNode cursor = rootPath;
-
-      //build parent directories
-      for (Path pathItem : root.relativize(Paths.get(ftpFile.getName()).getParent())) {
-        pathCursor = pathCursor.resolve(pathItem);
-        FTPFile folder = ftpFile(pathCursor.getFileName().toString());
-        folder.setType(DIRECTORY_TYPE);
-        cursor = cursor.addChild(buildTreeNode(folder, pathCursor.toString()));
-      }
-      cursor.addChild(buildTreeNode(ftpFile, ftpFile.getName()));
+    @Override
+    public @NotNull InputStream getInputStream(@NotNull String id) throws Exception {
+      return entity.execute(ftpClient -> {
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        ftpClient.setFileType(FTPClient.BINARY_FILE_TYPE);
+        if (!ftpClient.retrieveFile(id, outputStream)) {
+          throw new RuntimeException("Unable to retrieve file: <" + id + "> from ftp. Msg: " + ftpClient.getReplyString());
+        }
+        return new ByteArrayInputStream(outputStream.toByteArray());
+      }, true);
     }
-    return rootPath;
+
+    @Override
+    public void mkdir(@NotNull String id) throws Exception {
+      entity.execute(ftpClient -> {
+        ftpClient.makeDirectory(id);
+        return null;
+      }, false);
+    }
+
+    @Override
+    public void put(@NotNull InputStream inputStream, @NotNull String id) throws Exception {
+      entity.execute(ftpClient -> {
+        ftpClient.setFileType(FTPClient.BINARY_FILE_TYPE);
+        return ftpClient.storeFile(id, inputStream);
+      }, true);
+    }
+
+    @Override
+    public void rename(@NotNull String oldName, @NotNull String newName) throws Exception {
+      entity.execute(ftpClient -> ftpClient.rename(oldName, newName), false);
+    }
+
+    @Override
+    public FtpFile getFile(@NotNull String id) throws Exception {
+      return entity.execute(ftpClient -> {
+        FTPFile file = ftpClient.mlistFile(id);
+        return file == null ? null : new FtpFile(id, file);
+      }, false);
+    }
+
+    @Override
+    @SneakyThrows
+    public List<FtpFile> readChildren(@NotNull String parentId) {
+      return entity.execute(ftpClient ->
+          Stream.of(ftpClient.listFiles(parentId))
+                .map(id -> new FtpFile(fixPath(Paths.get(parentId).resolve(id.getName())), id))
+                .collect(Collectors.toList()), false);
+    }
+
+    @Override
+    @SneakyThrows
+    public boolean rm(@NotNull FtpFile ftpFile) {
+      return entity.execute(ftpClient -> {
+        if (ftpFile.isDirectory()) {
+          return ftpClient.removeDirectory(ftpFile.getId());
+        } else {
+          return ftpClient.deleteFile(ftpFile.getId());
+        }
+      }, false);
+    }
+
+    @Override
+    @SneakyThrows
+    public void recreate() {
+    }
   }
 }
