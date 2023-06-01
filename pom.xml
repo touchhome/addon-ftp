@@ -6,14 +6,10 @@
   <name>Ftp</name>
   <packaging>jar</packaging>
 
-  <properties>
-    <category>Storage</category>
-  </properties>
-
   <parent>
     <artifactId>addon-parent</artifactId>
     <groupId>org.homio.addon</groupId>
-    <version>1.2.5-SNAPSHOT</version>
+    <version>1.2.5</version>
   </parent>
 
   <version>1.0.2-SNAPSHOT</version>
