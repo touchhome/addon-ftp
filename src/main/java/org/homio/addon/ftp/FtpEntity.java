@@ -15,6 +15,7 @@ import org.homio.api.EntityContext;
 import org.homio.api.entity.storage.BaseFileSystemEntity;
 import org.homio.api.entity.types.StorageEntity;
 import org.homio.api.model.ActionResponseModel;
+import org.homio.api.model.Icon;
 import org.homio.api.ui.UISidebarChildren;
 import org.homio.api.ui.field.UIField;
 import org.homio.api.ui.field.UIFieldGroup;
@@ -142,13 +143,8 @@ public class FtpEntity extends StorageEntity<FtpEntity> implements BaseFileSyste
   }
 
   @Override
-  public String getFileSystemIcon() {
-    return "fas fa-network-wired";
-  }
-
-  @Override
-  public String getFileSystemIconColor() {
-    return "#b32317";
+  public Icon getFileSystemIcon() {
+    return new Icon("fas fa-network-wired", "#B32317");
   }
 
   @Override
@@ -157,7 +153,7 @@ public class FtpEntity extends StorageEntity<FtpEntity> implements BaseFileSyste
   }
 
   @Override
-  public FtpFileSystem buildFileSystem(EntityContext entityContext) {
+  public @NotNull FtpFileSystem buildFileSystem(EntityContext entityContext) {
     return new FtpFileSystem(this, entityContext);
   }
 
@@ -187,7 +183,12 @@ public class FtpEntity extends StorageEntity<FtpEntity> implements BaseFileSyste
   }
 
   @Override
-  public String getEntityPrefix() {
+  public @NotNull Icon getIcon() {
+    return new Icon("fas fa-network-wired", "#b32317");
+  }
+
+  @Override
+  public @NotNull String getEntityPrefix() {
     return PREFIX;
   }
 
