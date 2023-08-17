@@ -98,7 +98,7 @@ public class FtpEntity extends StorageEntity<FtpEntity> implements BaseFileSyste
   }
 
   public FtpEntity setPassword(String value) {
-    setJsonData("pwd", value);
+    setJsonDataSecure("pwd", value);
     return this;
   }
 
@@ -180,11 +180,6 @@ public class FtpEntity extends StorageEntity<FtpEntity> implements BaseFileSyste
       return name;
     }
     return "Ftp";
-  }
-
-  @Override
-  public @NotNull Icon getIcon() {
-    return new Icon("fas fa-network-wired", "#b32317");
   }
 
   @Override
