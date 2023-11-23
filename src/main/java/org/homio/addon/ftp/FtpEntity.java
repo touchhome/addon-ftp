@@ -8,14 +8,17 @@ import java.net.Proxy;
 import java.net.Proxy.Type;
 import java.time.Duration;
 import java.util.Objects;
+import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.net.ftp.FTP;
 import org.apache.commons.net.ftp.FTPClient;
-import org.homio.api.EntityContext;
+import org.homio.addon.ftp.FtpEntity.FtpService;
+import org.homio.api.Context;
 import org.homio.api.entity.storage.BaseFileSystemEntity;
 import org.homio.api.entity.types.StorageEntity;
 import org.homio.api.model.ActionResponseModel;
 import org.homio.api.model.Icon;
+import org.homio.api.service.EntityService;
 import org.homio.api.ui.UISidebarChildren;
 import org.homio.api.ui.field.UIField;
 import org.homio.api.ui.field.UIFieldGroup;
@@ -23,14 +26,26 @@ import org.homio.api.ui.field.UIFieldPort;
 import org.homio.api.ui.field.UIFieldSlider;
 import org.homio.api.ui.field.action.UIContextMenuAction;
 import org.homio.api.ui.field.action.v1.UIInputBuilder;
+import org.homio.api.util.Lang;
 import org.homio.api.util.SecureString;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
+@SuppressWarnings({"JpaAttributeTypeInspection", "JpaAttributeMemberSignatureInspection"})
 @Entity
-@UISidebarChildren(icon = "fas fa-network-wired", color = "#b32317")
-public class FtpEntity extends StorageEntity<FtpEntity> implements BaseFileSystemEntity<FtpEntity, FtpFileSystem> {
+@UISidebarChildren(icon = "fas fa-network-wired", color = "#B32317")
+public class FtpEntity extends StorageEntity implements BaseFileSystemEntity<FtpEntity, FtpFileSystem>,
+    EntityService<FtpService> {
 
-  public static final String PREFIX = "ftp_";
+  public static final String PREFIX = "ftp";
+
+  @Override
+  public String getDescriptionImpl() {
+    if (getUrl().isEmpty()) {
+      return Lang.getServerMessage("FTP.DESCRIPTION");
+    }
+    return null;
+  }
 
   public @NotNull String getFileSystemRoot() {
     return getJsonData("fs_root", "/");
@@ -143,7 +158,7 @@ public class FtpEntity extends StorageEntity<FtpEntity> implements BaseFileSyste
   }
 
   @Override
-  public Icon getFileSystemIcon() {
+  public @NotNull Icon getFileSystemIcon() {
     return new Icon("fas fa-network-wired", "#B32317");
   }
 
@@ -153,8 +168,8 @@ public class FtpEntity extends StorageEntity<FtpEntity> implements BaseFileSyste
   }
 
   @Override
-  public @NotNull FtpFileSystem buildFileSystem(EntityContext entityContext) {
-    return new FtpFileSystem(this, entityContext);
+  public @NotNull FtpFileSystem buildFileSystem(@NotNull Context context) {
+    return new FtpFileSystem(this, context);
   }
 
   @Override
@@ -180,11 +195,6 @@ public class FtpEntity extends StorageEntity<FtpEntity> implements BaseFileSyste
       return name;
     }
     return "Ftp";
-  }
-
-  @Override
-  public @NotNull String getEntityPrefix() {
-    return PREFIX;
   }
 
   @UIContextMenuAction(value = "TEST_CONNECTION", icon = "fas fa-ethernet")
@@ -236,6 +246,34 @@ public class FtpEntity extends StorageEntity<FtpEntity> implements BaseFileSyste
     throw exception;
   }
 
+  @Override
+  public @Nullable Set<String> getConfigurationErrors() {
+    if (getUrl().isEmpty()) {
+      return Set.of("ERROR.NO_URL");
+    }
+    return null;
+  }
+
+  @Override
+  public long getEntityServiceHashCode() {
+    return getConnectionHashCode();
+  }
+
+  @Override
+  public @NotNull Class<FtpService> getEntityServiceItemClass() {
+    return FtpService.class;
+  }
+
+  @Override
+  public @Nullable FtpService createService(@NotNull Context context) {
+    return new FtpService(context, this);
+  }
+
+  @Override
+  protected @NotNull String getDevicePrefix() {
+    return PREFIX;
+  }
+
   @NotNull
   private FTPClient createFtpClient() {
     FTPClient ftpClient = new FTPClient();
@@ -250,5 +288,46 @@ public class FtpEntity extends StorageEntity<FtpEntity> implements BaseFileSyste
   @Override
   public void assembleActions(UIInputBuilder uiInputBuilder) {
 
+  }
+
+  public static class FtpService extends EntityService.ServiceInstance<FtpEntity> {
+
+    public FtpService(Context context, FtpEntity entity) {
+      super(context, entity, true);
+    }
+
+    @Override
+    protected void initialize() {
+      testServiceWithSetStatus();
+    }
+
+    @Override
+    public void testService() {
+      FTPClient ftpClient = entity.createFtpClient();
+      try {
+        try {
+          ftpClient.connect(entity.getUrl());
+        } catch (Exception ex) {
+          throw new RuntimeException("Error connect to remote url: " + ex.getMessage());
+        }
+        try {
+          if (!ftpClient.login(entity.getUser(), entity.getPassword().asString())) {
+            throw new RuntimeException("User or password incorrect.");
+          }
+        } catch (Exception ex) {
+          throw new RuntimeException("Error during attempt login to ftp: " + ex.getMessage());
+        }
+      } finally {
+        try {
+          ftpClient.disconnect();
+        } catch (IOException ignore) {
+        }
+      }
+    }
+
+    @Override
+    public void destroy(boolean forRestart, Exception ex) {
+
+    }
   }
 }

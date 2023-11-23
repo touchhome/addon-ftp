@@ -5,10 +5,7 @@
   "help": {
     "controlKeepAliveTimeout": "Sets the time to wait between sending control connection keepalive messages when processing file upload or download."
   },
-  "workspace": {
-    "ftp-storage": "Ftp"
-  },
-  "selection": {
+  "SELECTION": {
     "FtpEntity": "FTP"
   }
 }

@@ -16,28 +16,23 @@ import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import org.apache.commons.net.ftp.FTPClient;
 import org.apache.commons.net.ftp.FTPFile;
-import org.homio.api.EntityContext;
-import org.homio.api.entity.storage.BaseFileSystemEntity;
-import org.homio.api.fs.BaseCachedFileSystemProvider;
-import org.homio.api.fs.TreeNode;
 import org.homio.addon.ftp.FtpFileSystem.FtpFile;
 import org.homio.addon.ftp.FtpFileSystem.FtpFileService;
+import org.homio.api.Context;
+import org.homio.api.entity.storage.BaseFileSystemEntity;
+import org.homio.api.fs.BaseCachedFileSystemProvider;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 public class FtpFileSystem extends BaseCachedFileSystemProvider<FtpEntity, FtpFile, FtpFileService> {
 
-  public FtpFileSystem(FtpEntity entity, EntityContext entityContext) {
-    super(entity, entityContext);
+  public FtpFileSystem(FtpEntity entity, Context context) {
+    super(entity, context);
   }
 
   @Override
   protected @NotNull FtpFileService createService() {
     return new FtpFileService();
-  }
-
-  @Override
-  protected void buildTreeNodeExternal(TreeNode treeNode, FtpFile file) {
   }
 
   @RequiredArgsConstructor
